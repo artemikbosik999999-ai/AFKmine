@@ -1,7 +1,7 @@
 {
   "name": "minecraft-flood-bot",
   "version": "1.0.0",
-  "description": "Minecraft Flood Bot on Node.js",
+  "description": "Minecraft Flood Bot",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
