@@ -1,34 +1,15 @@
 {
-  "name": "minecraft-afk-bot",
-  "version": "2.0.0",
-  "description": "Minecraft AFK бот с прокси и генерацией ников",
+  "name": "minecraft-flood-bot",
+  "version": "1.0.0",
+  "description": "Minecraft Flood Bot on Node.js",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "start": "node bot.js"
   },
   "dependencies": {
-    "mineflayer": "^4.8.1",
     "telegraf": "^4.15.3",
-    "dotenv": "^16.3.1",
+    "mineflayer": "^4.8.1",
     "socks-proxy-agent": "^8.0.2",
-    "http-proxy-agent": "^7.0.0",
-    "https-proxy-agent": "^7.0.2",
-    "vec3": "^0.1.8"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "keywords": [
-    "minecraft",
-    "afk",
-    "bot",
-    "telegram",
-    "proxy"
-  ],
-  "author": "@artem_bori",
-  "license": "MIT"
+    "dotenv": "^16.3.1"
+  }
 }
