@@ -1,5 +1,5 @@
 // bot.js - Minecraft Flood Bot для Bothost (ПОЛНАЯ РАБОЧАЯ ВЕРСИЯ)
-const { Telegraf, Markup } = require('telegraf');
+const { Telegraf, Markup, session } = require('telegraf');
 const mineflayer = require('mineflayer');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 require('dotenv').config();
@@ -14,6 +14,9 @@ if (!BOT_TOKEN) {
 
 // ========== СОЗДАЕМ TELEGRAM БОТА ==========
 const bot = new Telegraf(BOT_TOKEN);
+
+// ========== ПОДКЛЮЧАЕМ СЕССИИ (ЭТО ВАЖНО!) ==========
+bot.use(session());
 
 // ========== ХРАНИЛИЩЕ ==========
 const users = new Map();
@@ -272,13 +275,13 @@ bot.start(async (ctx) => {
 });
 
 bot.action('add_server', async (ctx) => {
+    ctx.session = { state: 'awaiting_server' };
     await ctx.replyWithHTML(
         '<b>🌐 Добавление сервера</b>\n\n' +
         'Отправьте IP и порт сервера:\n' +
         '<code>ip:порт</code>\n\n' +
         'Пример: <code>mc.example.com:25565</code>'
     );
-    ctx.session = { state: 'awaiting_server' };
 });
 
 bot.action('proxies_menu', async (ctx) => {
@@ -303,12 +306,12 @@ bot.action('proxies_menu', async (ctx) => {
 });
 
 bot.action('load_proxies', async (ctx) => {
+    ctx.session = { state: 'awaiting_proxy_file' };
     await ctx.replyWithHTML(
         '<b>📎 Загрузите файл с прокси</b>\n\n' +
         'Отправьте текстовый файл\n' +
         'Каждая прокси на новой строке'
     );
-    ctx.session = { state: 'awaiting_proxy_file' };
 });
 
 bot.action('list_proxies', async (ctx) => {
@@ -400,8 +403,8 @@ bot.action(/select_server_(\d+)/, async (ctx) => {
 });
 
 bot.action('count_custom', async (ctx) => {
-    await ctx.reply('✏️ Введите количество ботов (число):');
     ctx.session.state = 'awaiting_custom_count';
+    await ctx.reply('✏️ Введите количество ботов (число):');
 });
 
 async function askForProxies(ctx) {
