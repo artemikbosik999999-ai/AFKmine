@@ -30,7 +30,77 @@ const CONFIG = {
     namePrefix: 'Flood_'
 };
 
-// ========== КЛАСС MINECRAFT БОТА С АВТО-ОПРЕДЕЛЕНИЕМ ВЕРСИИ ==========
+// ========== СПИСОК ВСЕХ ВЕРСИЙ ==========
+const ALL_VERSIONS = [
+    '1.21.3', '1.21.2', '1.21.1', '1.21',
+    '1.20.6', '1.20.5', '1.20.4', '1.20.3', '1.20.2', '1.20.1', '1.20',
+    '1.19.4', '1.19.3', '1.19.2', '1.19.1', '1.19',
+    '1.18.2', '1.18.1', '1.18',
+    '1.17.1', '1.17',
+    '1.16.5', '1.16.4', '1.16.3', '1.16.2', '1.16.1', '1.16',
+    '1.15.2', '1.15.1', '1.15',
+    '1.14.4', '1.14.3', '1.14.2', '1.14.1', '1.14',
+    '1.13.2', '1.13.1', '1.13',
+    '1.12.2', '1.12.1', '1.12',
+    '1.11.2', '1.11.1', '1.11',
+    '1.10.2', '1.10.1', '1.10',
+    '1.9.4', '1.9.3', '1.9.2', '1.9.1', '1.9',
+    '1.8.9', '1.8.8', '1.8.7', '1.8.6', '1.8.5', '1.8.4', '1.8.3', '1.8.2', '1.8.1', '1.8',
+    '1.7.10', '1.7.9', '1.7.8', '1.7.7', '1.7.6', '1.7.5', '1.7.4', '1.7.2',
+    '1.6.4', '1.6.2', '1.6.1',
+    '1.5.2', '1.5.1', '1.5',
+    '1.4.7', '1.4.6', '1.4.5', '1.4.4', '1.4.2',
+    '1.3.2', '1.3.1',
+    '1.2.5', '1.2.4', '1.2.3', '1.2.2', '1.2.1',
+    '1.1',
+    '1.0.1', '1.0.0',
+    // Beta версии
+    'Beta 1.9pre6', 'Beta 1.9pre5', 'Beta 1.9pre4', 'Beta 1.9pre3', 'Beta 1.9pre2', 'Beta 1.9pre',
+    'Beta 1.8.1', 'Beta 1.8',
+    'Beta 1.7.3', 'Beta 1.7.2', 'Beta 1.7.1', 'Beta 1.7_01', 'Beta 1.7',
+    'Beta 1.6.6', 'Beta 1.6.5', 'Beta 1.6.4', 'Beta 1.6.3', 'Beta 1.6.2', 'Beta 1.6.1', 'Beta 1.6',
+    'Beta 1.5_02', 'Beta 1.5_01', 'Beta 1.5',
+    'Beta 1.4_01', 'Beta 1.4',
+    'Beta 1.3_01', 'Beta 1.3',
+    'Beta 1.1_02', 'Beta 1.1_01', 'Beta 1.1',
+    'Beta 1.0.2', 'Beta 1.0_01', 'Beta 1.0',
+    // Alpha версии
+    'Alpha v1.2.6', 'Alpha v1.2.5', 'Alpha v1.2.4_01', 'Alpha v1.2.4',
+    'Alpha v1.2.3_04', 'Alpha v1.2.3_03', 'Alpha v1.2.3_02', 'Alpha v1.2.3_01', 'Alpha v1.2.3',
+    'Alpha v1.2.2', 'Alpha v1.2.1_01', 'Alpha v1.2.1',
+    'Alpha v1.2.0_02', 'Alpha v1.2.0_01', 'Alpha v1.2.0',
+    'Alpha v1.1.2_01', 'Alpha v1.1.2', 'Alpha v1.1.1', 'Alpha v1.1.0',
+    'Alpha v1.0.17_04', 'Alpha v1.0.17_03', 'Alpha v1.0.17_01', 'Alpha v1.0.17',
+    'Alpha v1.0.16_02', 'Alpha v1.0.16_01', 'Alpha v1.0.16',
+    'Alpha v1.0.15',
+    'Alpha v1.0.14_01', 'Alpha v1.0.14',
+    'Alpha v1.0.13_02', 'Alpha v1.0.13_01', 'Alpha v1.0.13',
+    'Alpha v1.0.12', 'Alpha v1.0.11',
+    'Alpha v1.0.10', 'Alpha v1.0.9',
+    'Alpha v1.0.8_01', 'Alpha v1.0.8',
+    'Alpha v1.0.7',
+    'Alpha v1.0.6_03', 'Alpha v1.0.6_02', 'Alpha v1.0.6_01', 'Alpha v1.0.6',
+    'Alpha v1.0.5_01', 'Alpha v1.0.5',
+    'Alpha v1.0.4',
+    'Alpha v1.0.3',
+    'Alpha v1.0.2_02', 'Alpha v1.0.2_01', 'Alpha v1.0.2',
+    'Alpha v1.0.1_01', 'Alpha v1.0.1',
+    'Alpha v1.0.0',
+    // Infdev версии
+    '20100630', '20100629', '20100627', '20100625-2', '20100625-1', '20100624', '20100618',
+    '20100617-3', '20100617-2', '20100617-1', '20100616', '20100615', '20100611', '20100608',
+    '20100607', '20100420', '20100415', '20100414', '20100413', '20100330', '20100327', '20100325',
+    '20100321', '20100320', '20100616', '20100313', '20100227',
+    // Indev версии
+    '20100223', '20100219', '20100218', '20100214-2', '20100214-1', '20100212-2', '20100212-1',
+    '20100207-2', '20100207-1', '20100206', '20100205', '20100204-2', '20100204-1', '20100203',
+    '20100201-3', '20100201-2', '20100201-1', '20100130', '20100129', '20100128', '20100125-2',
+    '20100125-1', '20100124', '20100122', '20100114', '20100113', '20100111-2', '20100111-1',
+    '20100109', '20100107', '20100106', '20100105', '20091231-2', '20091231-1', '20091223-2',
+    '20091223-1'
+];
+
+// ========== КЛАСС MINECRAFT БОТА ==========
 class FloodBot {
     constructor(name, host, port, proxy = null, onComplete = null) {
         this.name = name;
@@ -41,69 +111,14 @@ class FloodBot {
         this.bot = null;
         this.running = false;
         this.success = false;
+        console.log(`🤖 [${this.name}] Создан`);
     }
 
     async tryConnectWithVersions() {
-        const versions = [
-            '1.20.4', '1.20.2', '1.20.1', '1.20',
-            '1.19.4', '1.19.3', '1.19.2', '1.19.1', '1.19',
-            '1.18.2', '1.18.1', '1.18',
-            '1.17.1', '1.17',
-            '1.16.5', '1.16.4', '1.16.3', '1.16.2', '1.16.1', '1.16',
-            '1.15.2', '1.15.1', '1.15',
-            '1.14.4', '1.14.3', '1.14.2', '1.14.1', '1.14',
-            '1.13.2', '1.13.1', '1.13',
-            '1.12.2', '1.12.1', '1.12',
-            '1.11.2', '1.11.1', '1.11',
-            '1.10.2', '1.10.1', '1.10',
-            '1.9.4', '1.9.3', '1.9.2', '1.9.1', '1.9',
-            '1.8.9', '1.8.8', '1.8.7', '1.8.6', '1.8.5', '1.8.4', '1.8.3', '1.8.2', '1.8.1', '1.8'
-        ];
+        console.log(`🔍 [${this.name}] Пробую все версии из списка...`);
 
-        console.log(`🔍 [${this.name}] Пробую определить версию сервера...`);
-
-        try {
-            const options = {
-                host: this.host,
-                port: this.port,
-                username: this.name,
-                offline: true,
-                viewDistance: 'tiny'
-            };
-
-            if (this.proxy) {
-                const proxyUrl = `socks5://${this.proxy.username ? this.proxy.username + ':' + this.proxy.password + '@' : ''}${this.proxy.host}:${this.proxy.port}`;
-                options.agent = new SocksProxyAgent(proxyUrl);
-            }
-
-            this.bot = mineflayer.createBot(options);
-
-            const autoSuccess = await new Promise((resolve) => {
-                const timeout = setTimeout(() => {
-                    if (this.bot) this.bot.end();
-                    resolve(false);
-                }, 10000);
-
-                this.bot.once('login', () => {
-                    clearTimeout(timeout);
-                    console.log(`✅ [${this.name}] Авто-определение сработало!`);
-                    resolve(true);
-                });
-
-                this.bot.once('error', () => {
-                    clearTimeout(timeout);
-                    resolve(false);
-                });
-            });
-
-            if (autoSuccess) return true;
-        } catch (err) {
-            console.log(`❌ [${this.name}] Ошибка авто-определения`);
-        }
-
-        console.log(`🔄 [${this.name}] Перебираю версии...`);
-
-        for (const version of versions) {
+        // Сначала пробуем все версии из списка
+        for (const version of ALL_VERSIONS) {
             try {
                 console.log(`🔄 [${this.name}] Пробую версию ${version}...`);
                 
@@ -125,23 +140,34 @@ class FloodBot {
 
                 const success = await new Promise((resolve) => {
                     const timeout = setTimeout(() => {
-                        if (this.bot) this.bot.end();
+                        if (this.bot) {
+                            this.bot.end();
+                            console.log(`⏱️ [${this.name}] Таймаут версии ${version}`);
+                        }
                         resolve(false);
-                    }, 5000);
+                    }, 8000);
 
                     this.bot.once('login', () => {
                         clearTimeout(timeout);
-                        console.log(`✅ [${this.name}] Подключился с версией ${version}!`);
+                        console.log(`✅ [${this.name}] УСПЕХ! Версия ${version} подошла!`);
                         resolve(true);
                     });
 
-                    this.bot.once('error', () => {
+                    this.bot.once('error', (err) => {
                         clearTimeout(timeout);
+                        if (this.bot) this.bot.end();
+                        if (err.message.includes('version')) {
+                            console.log(`❌ [${this.name}] Версия ${version} не подходит`);
+                        } else {
+                            console.log(`❌ [${this.name}] Ошибка: ${err.message}`);
+                        }
                         resolve(false);
                     });
                 });
 
-                if (success) return true;
+                if (success) {
+                    return true;
+                }
 
                 if (this.bot) {
                     this.bot.end();
@@ -155,6 +181,47 @@ class FloodBot {
             }
         }
 
+        // Если ни одна версия не подошла, пробуем автоопределение
+        console.log(`🔄 [${this.name}] Пробую автоопределение...`);
+        try {
+            const options = {
+                host: this.host,
+                port: this.port,
+                username: this.name,
+                offline: true,
+                viewDistance: 'tiny'
+            };
+
+            if (this.proxy) {
+                const proxyUrl = `socks5://${this.proxy.username ? this.proxy.username + ':' + this.proxy.password + '@' : ''}${this.proxy.host}:${this.proxy.port}`;
+                options.agent = new SocksProxyAgent(proxyUrl);
+            }
+
+            this.bot = mineflayer.createBot(options);
+
+            const success = await new Promise((resolve) => {
+                const timeout = setTimeout(() => {
+                    if (this.bot) this.bot.end();
+                    resolve(false);
+                }, 10000);
+
+                this.bot.once('login', () => {
+                    clearTimeout(timeout);
+                    console.log(`✅ [${this.name}] Автоопределение сработало!`);
+                    resolve(true);
+                });
+
+                this.bot.once('error', () => {
+                    clearTimeout(timeout);
+                    resolve(false);
+                });
+            });
+
+            if (success) return true;
+        } catch (err) {
+            console.log(`❌ [${this.name}] Ошибка автоопределения`);
+        }
+
         return false;
     }
 
@@ -164,7 +231,7 @@ class FloodBot {
         const connected = await this.tryConnectWithVersions();
         
         if (!connected) {
-            console.log(`❌ [${this.name}] Не удалось подключиться ни с одной версией`);
+            console.log(`❌ [${this.name}] Не удалось подключиться`);
             this.success = false;
             this.stop();
             return;
@@ -891,7 +958,7 @@ bot.on('document', async (ctx) => {
 bot.launch();
 console.log('\n' + '='.repeat(50));
 console.log('🤖 Minecraft Flood Bot запущен!');
-console.log('✅ 100% рабочая версия на Node.js');
+console.log('✅ Поддержка всех версий Minecraft');
 console.log('👑 Владелец: @artem_bori');
 console.log('='.repeat(50) + '\n');
 
